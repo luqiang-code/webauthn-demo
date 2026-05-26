@@ -7,7 +7,7 @@ export function getCredentials(username: string): WebAuthnCredential[] {
   return users.get(username) ?? [];
 }
 
-export function addCredential(username: string, credential: WebAuthnCredential): void {
+export function saveCredential(username: string, credential: WebAuthnCredential): void {
   const existing = getCredentials(username);
   existing.push(credential);
   users.set(username, existing);
