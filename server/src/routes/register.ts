@@ -1,6 +1,6 @@
 // 注册流程数据流：
 //   POST /options → 生成 challenge（存内存 Map）→ 返回给浏览器
-//   POST /verify  → 消费 challenge + 验证签名 → 凭证公钥存入 SQLite
+//   POST /verify  → 消费 challenge + 验证签名 → 凭证公钥存入 SQLite → 签发 session（自动登录）
 //   私钥始终在用户设备（Touch ID/Windows Hello/安全密钥），从不离开浏览器
 
 import { Router } from "express";
@@ -29,6 +29,13 @@ router.post("/options", async (req, res) => {
   if (!username) return res.status(400).json({ error: "username required" });
 
   const existing = getCredentials(username);
+
+  // 用户名唯一性检查：
+  // - 未登录状态：禁止注册已被占用的用户名
+  // - 已登录状态：仅允许该用户给自己添加更多 passkey
+  if (existing.length > 0 && req.session.username !== username) {
+    return res.status(409).json({ error: "该用户名已被注册" });
+  }
 
   const options = (await generateRegistrationOptions({
     rpName: RP_NAME,
@@ -78,7 +85,9 @@ router.post("/verify", async (req, res) => {
       transports: (registrationResponse as any).response?.transports,
     };
     saveCredential(username, newCred);
-    console.log(`✓ Registered credential for "${username}"`);
+    // 注册成功后自动登录
+    req.session.username = username;
+    console.log(`✓ Registered credential for "${username}" (session created)`);
     return res.json({ verified: true } satisfies VerifyResponse);
   }
 

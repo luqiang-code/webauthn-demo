@@ -81,3 +81,17 @@ export async function verifyAuthentication(
     authenticationResponse,
   } satisfies AuthVerifyRequest);
 }
+
+export async function getCurrentUser(): Promise<{ username: string }> {
+  const res = await fetch("/api/auth/me");
+  if (!res.ok) {
+    if (res.status === 401) throw new ApiError(401, "Not authenticated");
+    throw new ApiError(res.status, `Server error (${res.status})`);
+  }
+  return res.json();
+}
+
+export async function logout(): Promise<void> {
+  const res = await fetch("/api/auth/logout", { method: "POST" });
+  if (!res.ok) throw new ApiError(res.status, "Logout failed");
+}

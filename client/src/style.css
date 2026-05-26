@@ -173,6 +173,19 @@ body {
 
 @keyframes fadeIn { from { opacity: 0; transform: translateY(-4px); } }
 
+/* ── Logged-in State ─────────────────────────────────────── */
+.logged-in-badge {
+  display: flex; align-items: center; justify-content: center; gap: .5rem;
+  padding: .75rem 1rem;
+  margin-bottom: 1rem;
+  background: #ecfdf5;
+  border: 1px solid #a7f3d0;
+  border-radius: 10px;
+  font-size: .9rem;
+  color: #065f46;
+}
+.logged-in-badge svg { color: #059669; flex-shrink: 0; }
+
 /* ── Footer ───────────────────────────────────────────────── */
 .card-footer {
   margin-top: 1.25rem;

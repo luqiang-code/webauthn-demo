@@ -2,15 +2,35 @@
 // 部署架构（开发环境）：
 //   浏览器 :5173 → Vite dev server → proxy /api → localhost:3000
 //   数据存储：server/data/webauthn.db（SQLite，持久化凭证）
+//   Session：express-session（内存，24h 过期）
 
 import express from "express";
+import session from "express-session";
 import cors from "cors";
 import registerRoutes from "./routes/register";
 import authRoutes from "./routes/auth";
 
 const app = express();
 app.use(express.json());
-app.use(cors({ origin: "http://localhost:5173" }));
+
+const SESSION_MAX_AGE = 24 * 60 * 60 * 1000; // 24 小时
+
+app.use(session({
+  secret: "webauthn-demo-dev-secret",
+  resave: false,
+  saveUninitialized: false,
+  cookie: {
+    maxAge: SESSION_MAX_AGE,
+    httpOnly: true,
+    sameSite: "lax",
+    secure: process.env.NODE_ENV === "production",
+  },
+}));
+
+app.use(cors({
+  origin: "http://localhost:5173",
+  credentials: true,
+}));
 
 app.use("/api/register", registerRoutes);
 app.use("/api/auth", authRoutes);

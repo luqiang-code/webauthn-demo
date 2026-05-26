@@ -40,28 +40,40 @@
     <span id="statusText">检测中...</span>
   </div>
 
-  <!-- Username -->
-  <div class="input-group">
-    <label for="username">用户名</label>
-    <input id="username" type="text" placeholder="输入用户名" autocomplete="webauthn" />
+  <!-- Logged-in state (hidden by default) -->
+  <div id="loggedInState" style="display:none">
+    <div class="logged-in-badge">
+      <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" width="20" height="20">
+        <path d="M5 13l4 4L19 7" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+      <span>已登录：<strong id="loggedInUser"></strong></span>
+    </div>
+    <button class="btn btn-secondary" id="btnLogout">登出</button>
   </div>
 
-  <!-- Buttons -->
-  <button class="btn btn-primary" id="btnAuth">
-    <svg class="btn-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round">
-      <path d="M4 11 C4 8 7 5 10 5 C13 5 16 8 16 11" />
-      <path d="M5.5 11 C5.5 9 7.5 7 10 7 C12.5 7 14.5 9 14.5 11" />
-      <path d="M7 11 C7 10 8.3 8.5 10 8.5 C11.7 8.5 13 10 13 11" />
-      <circle cx="10" cy="12" r="1" fill="currentColor" stroke="none" />
-    </svg>
-    <span class="btn-text">通过指纹登录</span>
-    <span class="btn-spinner"></span>
-  </button>
+  <!-- Login form (hidden when logged in) -->
+  <div id="loginForm">
+    <div class="input-group">
+      <label for="username">用户名</label>
+      <input id="username" type="text" placeholder="输入用户名" autocomplete="webauthn" />
+    </div>
 
-  <button class="btn btn-secondary" id="btnRegister">
-    <span class="btn-text">注册新设备</span>
-    <span class="btn-spinner"></span>
-  </button>
+    <button class="btn btn-primary" id="btnAuth">
+      <svg class="btn-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round">
+        <path d="M4 11 C4 8 7 5 10 5 C13 5 16 8 16 11" />
+        <path d="M5.5 11 C5.5 9 7.5 7 10 7 C12.5 7 14.5 9 14.5 11" />
+        <path d="M7 11 C7 10 8.3 8.5 10 8.5 C11.7 8.5 13 10 13 11" />
+        <circle cx="10" cy="12" r="1" fill="currentColor" stroke="none" />
+      </svg>
+      <span class="btn-text">通过指纹登录</span>
+      <span class="btn-spinner"></span>
+    </button>
+
+    <button class="btn btn-secondary" id="btnRegister">
+      <span class="btn-text">注册新设备</span>
+      <span class="btn-spinner"></span>
+    </button>
+  </div>
 
   <!-- Message -->
   <div class="msg" id="msg">

@@ -1,6 +1,8 @@
 // 认证流程数据流：
 //   POST /options → 查 SQLite 是否有该用户的凭证 → 生成 challenge（存内存 Map）→ 返回
-//   POST /verify  → 消费 challenge + 查 SQLite 取公钥验证签名 → 更新 counter 回 SQLite
+//   POST /verify  → 消费 challenge + 查 SQLite 取公钥验证签名 → 更新 counter 回 SQLite → 签发 session
+//   GET  /me       → 返回当前 session 中的用户信息
+//   POST /logout   → 销毁 session
 //   私钥签名在用户设备本地完成，服务器只验证签名，不接触私钥
 
 import { Router } from "express";
@@ -75,15 +77,37 @@ router.post("/verify", async (req, res) => {
   if (verification.verified) {
     // 更新 SQLite 中的 counter，防止签名重放
     // counter 是认证器内部单调递增的签名计数，每次签名 +1
-    credential.counter = verification.authenticationInfo.newCounter;
     updateCredentialCounter(credential.id, verification.authenticationInfo.newCounter);
-    console.log(`✓ Authenticated "${username}"`);
+
+    // 签发 session，标记用户已登录
+    req.session.username = username;
+
+    console.log(`✓ Authenticated "${username}" (session created)`);
     return res.json({ verified: true } satisfies VerifyResponse);
   }
 
   res
     .status(400)
     .json({ verified: false, error: "Verification failed" } satisfies VerifyResponse);
+});
+
+// GET /api/auth/me — 检查当前 session 是否已登录
+router.get("/me", (req, res) => {
+  if (req.session.username) {
+    return res.json({ username: req.session.username });
+  }
+  res.status(401).json({ error: "Not authenticated" });
+});
+
+// POST /api/auth/logout — 销毁 session
+router.post("/logout", (req, res) => {
+  req.session.destroy((err) => {
+    if (err) {
+      return res.status(500).json({ error: "Logout failed" });
+    }
+    res.clearCookie("connect.sid");
+    res.json({ ok: true });
+  });
 });
 
 export default router;
