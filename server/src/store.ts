@@ -1,66 +1,82 @@
 import type { WebAuthnCredential } from "@simplewebauthn/server";
-import { readFileSync, writeFileSync, mkdirSync, existsSync } from "node:fs";
+import Database from "better-sqlite3";
 import { join, dirname } from "node:path";
+import { mkdirSync, existsSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const DATA_DIR = join(__dirname, "..", "data");
-const DB_PATH = join(DATA_DIR, "credentials.json");
+if (!existsSync(DATA_DIR)) mkdirSync(DATA_DIR, { recursive: true });
 
-// In-memory credential store, persisted to JSON file
-const users = new Map<string, WebAuthnCredential[]>();
+const db = new Database(join(DATA_DIR, "webauthn.db"));
 
-// Load from disk on startup
-function load(): void {
-  try {
-    if (!existsSync(DB_PATH)) return;
-    const raw = readFileSync(DB_PATH, "utf-8");
-    const data: [string, WebAuthnCredential[]][] = JSON.parse(raw);
-    for (const [username, creds] of data) {
-      users.set(username, creds);
-    }
-    console.log(`Loaded ${users.size} user(s) from disk`);
-  } catch (err) {
-    console.error("Failed to load credentials from disk:", err);
-  }
+db.pragma("journal_mode = WAL");
+db.pragma("foreign_keys = ON");
+
+db.exec(`
+  CREATE TABLE IF NOT EXISTS credentials (
+    id TEXT PRIMARY KEY,
+    username TEXT NOT NULL,
+    public_key BLOB NOT NULL,
+    counter INTEGER NOT NULL DEFAULT 0,
+    transports TEXT
+  )
+`);
+
+db.exec(`CREATE INDEX IF NOT EXISTS idx_credentials_username ON credentials (username)`);
+
+// ── Prepared statements ────────────────────────────────────────
+
+const stmtGetByUsername = db.prepare("SELECT * FROM credentials WHERE username = ?");
+const stmtGetById = db.prepare("SELECT * FROM credentials WHERE id = ?");
+const stmtInsert = db.prepare(`
+  INSERT INTO credentials (id, username, public_key, counter, transports)
+  VALUES (@id, @username, @publicKey, @counter, @transports)
+`);
+const stmtUpdateCounter = db.prepare("UPDATE credentials SET counter = ? WHERE id = ?");
+
+// ── Public API ──────────────────────────────────────────────────
+
+function rowToCredential(row: any): WebAuthnCredential {
+  return {
+    id: row.id,
+    publicKey: row.public_key,
+    counter: row.counter,
+    transports: row.transports ? row.transports.split(",") : undefined,
+  };
 }
-
-// Persist to disk on every write
-function persist(): void {
-  try {
-    if (!existsSync(DATA_DIR)) mkdirSync(DATA_DIR, { recursive: true });
-    const data = Array.from(users.entries());
-    writeFileSync(DB_PATH, JSON.stringify(data, null, 2), "utf-8");
-  } catch (err) {
-    console.error("Failed to persist credentials:", err);
-  }
-}
-
-load();
 
 export function getCredentials(username: string): WebAuthnCredential[] {
-  return users.get(username) ?? [];
+  return (stmtGetByUsername.all(username) as any[]).map(rowToCredential);
 }
 
 export function saveCredential(username: string, credential: WebAuthnCredential): void {
-  const existing = getCredentials(username);
-  existing.push(credential);
-  users.set(username, existing);
-  persist();
-}
-
-export function persistCredentials(): void {
-  persist();
+  stmtInsert.run({
+    id: credential.id,
+    username,
+    publicKey: credential.publicKey,
+    counter: credential.counter,
+    transports: credential.transports?.join(",") ?? null,
+  });
 }
 
 export function findCredential(
   username: string,
   credentialId: string,
 ): WebAuthnCredential | undefined {
-  return getCredentials(username).find((c) => c.id === credentialId);
+  const row = stmtGetById.get(credentialId) as any;
+  if (row && row.username === username) return rowToCredential(row);
 }
 
-// Challenge store — ephemeral, no persistence needed
+export function persistCredentials(): void {
+  // counter updates happen via updateCounter — no-op for full persist
+}
+
+export function updateCredentialCounter(credentialId: string, counter: number): void {
+  stmtUpdateCounter.run(counter, credentialId);
+}
+
+// Challenge store — ephemeral
 const challenges = new Map<string, string>();
 
 export function saveChallenge(key: string, challenge: string): void {

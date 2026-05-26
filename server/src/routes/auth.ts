@@ -9,7 +9,7 @@ import type {
   AuthOptionsResponse,
   VerifyResponse,
 } from "@webauthn-demo/shared";
-import { getCredentials, findCredential, persistCredentials, saveChallenge, consumeChallenge } from "../store.js";
+import { getCredentials, findCredential, updateCredentialCounter, saveChallenge, consumeChallenge } from "../store.js";
 
 const router = Router();
 
@@ -70,7 +70,7 @@ router.post("/verify", async (req, res) => {
   if (verification.verified) {
     // Update counter to prevent replay
     credential.counter = verification.authenticationInfo.newCounter;
-    persistCredentials();
+    updateCredentialCounter(credential.id, verification.authenticationInfo.newCounter);
     console.log(`✓ Authenticated "${username}"`);
     return res.json({ verified: true } satisfies VerifyResponse);
   }
