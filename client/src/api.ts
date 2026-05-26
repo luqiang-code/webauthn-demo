@@ -8,7 +8,7 @@ import type {
   AuthVerifyRequest,
 } from "@webauthn-demo/shared";
 
-const BASE = "http://localhost:3000";
+const BASE = "";
 
 export class ApiError extends Error {
   constructor(
