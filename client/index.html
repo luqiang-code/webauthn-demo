@@ -3,58 +3,75 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Passkey Demo</title>
-  <style>
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-    body {
-      font-family: system-ui, -apple-system, sans-serif;
-      display: flex; justify-content: center; align-items: center;
-      min-height: 100vh; background: #f5f5f5;
-    }
-    .card {
-      background: #fff; border-radius: 12px;
-      padding: 2rem; width: 100%; max-width: 400px;
-      box-shadow: 0 4px 24px rgba(0,0,0,.08);
-    }
-    h1 { font-size: 1.5rem; margin-bottom: 1.5rem; text-align: center; }
-    label { display: block; font-weight: 600; margin-bottom: .25rem; }
-    input {
-      width: 100%; padding: .6rem .75rem; border: 1px solid #d1d5db;
-      border-radius: 8px; font-size: 1rem; margin-bottom: 1rem;
-    }
-    button {
-      width: 100%; padding: .7rem; border: none; border-radius: 8px;
-      font-size: 1rem; font-weight: 600; cursor: pointer;
-      transition: opacity .15s;
-    }
-    button:disabled { opacity: .5; cursor: not-allowed; }
-    .btn-reg { background: #1d4ed8; color: #fff; margin-bottom: .5rem; }
-    .btn-auth { background: #059669; color: #fff; }
-    .msg {
-      margin-top: 1rem; padding: .75rem; border-radius: 8px;
-      font-size: .875rem; text-align: center; display: none;
-    }
-    .msg.success { display: block; background: #ecfdf5; color: #065f46; }
-    .msg.error   { display: block; background: #fef2f2; color: #991b1b; }
-    hr { margin: 1.5rem 0; border: none; border-top: 1px solid #e5e7eb; }
-  </style>
+  <title>Passkey 登录</title>
+  <link rel="stylesheet" href="/src/style.css" />
 </head>
 <body>
-<div class="card">
-  <h1>Passkey Demo</h1>
 
-  <label for="username">用户名</label>
-  <input id="username" type="text" placeholder="输入用户名" autocomplete="webauthn" />
+<div class="card" id="app">
+  <!-- Header -->
+  <div class="card-header">
+    <h1>Passkey 登录</h1>
+    <p class="subtitle">通过指纹或面容安全登录</p>
+  </div>
 
-  <button class="btn-reg" id="btnRegister">注册 Passkey</button>
-  <button class="btn-auth" id="btnAuth">使用 Passkey 登录</button>
+  <!-- Fingerprint visual -->
+  <div class="fingerprint-area" id="fingerprintArea">
+    <svg class="fingerprint-icon" id="fingerprintIcon" viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round">
+      <!-- Outer -->
+      <path d="M18 26 C18 18 26 12 32 12 C38 12 46 18 46 26 C46 30 44 34 42 37" />
+      <path d="M20 26 C20 19 26 14 32 14 C38 14 44 19 44 26" />
+      <!-- Mid -->
+      <path d="M22 26 C22 21 26 17 32 17 C38 17 42 21 42 26 C42 29 40 32 38 34" />
+      <path d="M24 26 C24 22 27 19 32 19 C37 19 40 22 40 26" />
+      <!-- Inner -->
+      <path d="M26 26 C26 23 28 21 32 21 C36 21 38 23 38 26 C38 28 37 29 36 30" />
+      <path d="M28 26 C28 24 29 23 32 23 C35 23 36 24 36 26" />
+      <!-- Center -->
+      <path d="M30 26 C30 25 31 24 32 24 C33 24 34 25 34 26" />
+      <circle cx="32" cy="26" r="1.5" fill="#94a3b8" stroke="none" />
+    </svg>
+    <div class="fingerprint-spinner" id="fingerprintSpinner" style="display:none"></div>
+  </div>
 
-  <div class="msg" id="msg"></div>
+  <!-- Status bar -->
+  <div class="status-bar" id="statusBar" style="display:none">
+    <span class="status-dot" id="statusDot"></span>
+    <span id="statusText">检测中...</span>
+  </div>
 
-  <hr />
-  <p style="font-size:.75rem;color:#9ca3af;text-align:center;">
-    基于 <a href="https://simplewebauthn.dev" target="_blank">SimpleWebAuthn</a>
-  </p>
+  <!-- Username -->
+  <div class="input-group">
+    <label for="username">用户名</label>
+    <input id="username" type="text" placeholder="输入用户名" autocomplete="webauthn" />
+  </div>
+
+  <!-- Buttons -->
+  <button class="btn btn-primary" id="btnAuth">
+    <svg class="btn-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round">
+      <path d="M4 11 C4 8 7 5 10 5 C13 5 16 8 16 11" />
+      <path d="M5.5 11 C5.5 9 7.5 7 10 7 C12.5 7 14.5 9 14.5 11" />
+      <path d="M7 11 C7 10 8.3 8.5 10 8.5 C11.7 8.5 13 10 13 11" />
+      <circle cx="10" cy="12" r="1" fill="currentColor" stroke="none" />
+    </svg>
+    <span class="btn-text">通过指纹登录</span>
+    <span class="btn-spinner"></span>
+  </button>
+
+  <button class="btn btn-secondary" id="btnRegister">
+    <span class="btn-text">注册新设备</span>
+    <span class="btn-spinner"></span>
+  </button>
+
+  <!-- Message -->
+  <div class="msg" id="msg">
+    <span class="msg-text" id="msgText"></span>
+  </div>
+
+  <!-- Footer -->
+  <div class="card-footer">
+    <p>基于 <a href="https://simplewebauthn.dev" target="_blank">SimpleWebAuthn</a></p>
+  </div>
 </div>
 
 <script type="module" src="/src/main.ts"></script>

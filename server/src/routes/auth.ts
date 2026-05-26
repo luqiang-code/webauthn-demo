@@ -9,7 +9,7 @@ import type {
   AuthOptionsResponse,
   VerifyResponse,
 } from "@webauthn-demo/shared";
-import { getCredentials, findCredential } from "../store.js";
+import { getCredentials, findCredential, saveChallenge, consumeChallenge } from "../store.js";
 
 const router = Router();
 
@@ -23,14 +23,15 @@ router.post("/options", async (req, res) => {
 
   const options = (await generateAuthenticationOptions({
     rpID: RP_ID,
-    allowCredentials: credentials?.map((cred) => ({
+    allowCredentials: credentials.map((cred) => ({
       id: cred.id,
       transports: cred.transports,
     })),
-    userVerification: "preferred",
+    userVerification: "required",
   })) as unknown as AuthOptionsResponse;
 
-  (req as any)._challenge = options.challenge;
+  // Persist challenge so verify can consume it
+  saveChallenge(username, options.challenge);
 
   res.json(options);
 });
@@ -38,7 +39,11 @@ router.post("/options", async (req, res) => {
 // POST /api/auth/verify
 router.post("/verify", async (req, res) => {
   const { username, authenticationResponse } = req.body as AuthVerifyRequest;
-  const expectedChallenge = (req as any)._challenge;
+
+  const expectedChallenge = consumeChallenge(username);
+  if (!expectedChallenge) {
+    return res.status(400).json({ error: "Challenge expired or missing" });
+  }
 
   const credential = findCredential(username, authenticationResponse.id as string);
   if (!credential) {
@@ -47,7 +52,7 @@ router.post("/verify", async (req, res) => {
 
   const verification = await verifyAuthenticationResponse({
     response: authenticationResponse as any,
-    expectedChallenge: expectedChallenge ?? "",
+    expectedChallenge,
     expectedOrigin: ORIGIN,
     expectedRPID: RP_ID,
     credential: {
@@ -59,6 +64,8 @@ router.post("/verify", async (req, res) => {
   });
 
   if (verification.verified) {
+    // Update counter to prevent replay
+    credential.counter = verification.authenticationInfo.newCounter;
     console.log(`✓ Authenticated "${username}"`);
     return res.json({ verified: true } satisfies VerifyResponse);
   }

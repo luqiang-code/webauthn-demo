@@ -10,7 +10,7 @@ import type {
   RegisterOptionsResponse,
   VerifyResponse,
 } from "@webauthn-demo/shared";
-import { getCredentials, saveCredential } from "../store.js";
+import { getCredentials, saveCredential, saveChallenge, consumeChallenge } from "../store.js";
 
 const router = Router();
 
@@ -35,12 +35,13 @@ router.post("/options", async (req, res) => {
       transports: cred.transports,
     })),
     authenticatorSelection: {
-      residentKey: "preferred",
-      userVerification: "preferred",
+      residentKey: "required",
+      userVerification: "required",
     },
   })) as unknown as RegisterOptionsResponse;
 
-  (req as any)._challenge = options.challenge;
+  // Persist challenge so verify can consume it
+  saveChallenge(username, options.challenge);
 
   res.json(options);
 });
@@ -48,11 +49,15 @@ router.post("/options", async (req, res) => {
 // POST /api/register/verify
 router.post("/verify", async (req, res) => {
   const { username, registrationResponse } = req.body as RegisterVerifyRequest;
-  const expectedChallenge = (req as any)._challenge;
+
+  const expectedChallenge = consumeChallenge(username);
+  if (!expectedChallenge) {
+    return res.status(400).json({ error: "Challenge expired or missing" });
+  }
 
   const verification = await verifyRegistrationResponse({
     response: registrationResponse as any,
-    expectedChallenge: expectedChallenge ?? "",
+    expectedChallenge,
     expectedOrigin: ORIGIN,
     expectedRPID: RP_ID,
   });

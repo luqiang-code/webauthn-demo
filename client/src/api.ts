@@ -1,22 +1,43 @@
-import {
-  type RegisterOptionsResponse,
-  type AuthOptionsResponse,
-  type VerifyResponse,
-  type RegisterOptionsRequest,
-  type RegisterVerifyRequest,
-  type AuthOptionsRequest,
-  type AuthVerifyRequest,
+import type {
+  RegisterOptionsResponse,
+  AuthOptionsResponse,
+  VerifyResponse,
+  RegisterOptionsRequest,
+  RegisterVerifyRequest,
+  AuthOptionsRequest,
+  AuthVerifyRequest,
 } from "@webauthn-demo/shared";
 
 const BASE = "http://localhost:3000";
 
-async function post<T>(path: string, body: unknown): Promise<T> {
+export class ApiError extends Error {
+  constructor(
+    public status: number,
+    message: string,
+  ) {
+    super(message);
+    this.name = "ApiError";
+  }
+}
+
+async function post<T>(path: string, body: unknown, signal?: AbortSignal): Promise<T> {
   const res = await fetch(`${BASE}${path}`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
+    signal,
   });
-  return res.json();
+
+  const data = await res.json();
+
+  if (!res.ok) {
+    throw new ApiError(
+      res.status,
+      (data as any)?.error ?? `Server error (${res.status})`,
+    );
+  }
+
+  return data as T;
 }
 
 export async function getRegisterOptions(
