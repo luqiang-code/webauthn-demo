@@ -16,3 +16,17 @@ export function addCredential(username: string, credential: WebAuthnCredential):
 export function findCredential(username: string, credentialId: string): WebAuthnCredential | undefined {
   return getCredentials(username).find((c) => c.id === credentialId);
 }
+
+// Challenge store — maps user identifier → challenge string
+// In production, use a session store or signed JWT
+const challenges = new Map<string, string>();
+
+export function saveChallenge(key: string, challenge: string): void {
+  challenges.set(key, challenge);
+}
+
+export function consumeChallenge(key: string): string | undefined {
+  const c = challenges.get(key);
+  challenges.delete(key); // one-time use
+  return c;
+}
