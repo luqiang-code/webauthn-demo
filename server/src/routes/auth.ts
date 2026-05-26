@@ -14,7 +14,7 @@ import { getCredentials, findCredential, saveChallenge, consumeChallenge } from 
 const router = Router();
 
 const RP_ID = "localhost";
-const ORIGIN = "http://localhost:3000";
+const ORIGIN = "http://localhost:5173";
 
 // POST /api/auth/options
 router.post("/options", async (req, res) => {
