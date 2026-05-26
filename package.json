@@ -1,19 +1,12 @@
 {
   "name": "webauthn-demo",
-  "version": "1.0.0",
-  "description": "SimpleWebAuthn Passkey Demo",
+  "private": true,
+  "workspaces": ["shared", "server", "client"],
   "scripts": {
-    "dev": "tsx src/server.ts",
-    "build": "tsc",
-    "start": "node dist/server.js"
-  },
-  "dependencies": {
-    "@simplewebauthn/server": "^13.3.0",
-    "express": "^5.1.0"
-  },
-  "devDependencies": {
-    "@types/express": "^5.0.0",
-    "tsx": "^4.19.0",
-    "typescript": "^5.7.0"
+    "dev:server": "npm run dev -w server",
+    "dev:client": "npm run dev -w client",
+    "dev": "npm run dev:server & npm run dev:client",
+    "build": "npm run build -w shared && npm run build -w server && npm run build -w client",
+    "check": "npm run check -w shared && npm run check -w server && npm run check -w client"
   }
 }
