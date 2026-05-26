@@ -21,6 +21,10 @@ router.post("/options", async (req, res) => {
   const { username } = req.body as AuthOptionsRequest;
   const credentials = getCredentials(username);
 
+  if (credentials.length === 0) {
+    return res.status(400).json({ error: "该用户未注册 Passkey，请先注册" });
+  }
+
   const options = (await generateAuthenticationOptions({
     rpID: RP_ID,
     allowCredentials: credentials.map((cred) => ({
