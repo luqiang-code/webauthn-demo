@@ -15,8 +15,8 @@ import { getCredentials, saveCredential, saveChallenge, consumeChallenge } from 
 const router = Router();
 
 const RP_NAME = "WebAuthn Demo";
-const RP_ID = "localhost";
-const ORIGIN = "http://localhost:5173";
+const RP_ID = process.env.RP_ID ?? "localhost";
+const ORIGIN = process.env.ORIGIN ?? "http://localhost:5173";
 
 // POST /api/register/options
 router.post("/options", async (req, res) => {
