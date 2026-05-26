@@ -1,3 +1,8 @@
+// 注册流程数据流：
+//   POST /options → 生成 challenge（存内存 Map）→ 返回给浏览器
+//   POST /verify  → 消费 challenge + 验证签名 → 凭证公钥存入 SQLite
+//   私钥始终在用户设备（Touch ID/Windows Hello/安全密钥），从不离开浏览器
+
 import { Router } from "express";
 import {
   generateRegistrationOptions,
@@ -40,7 +45,7 @@ router.post("/options", async (req, res) => {
     },
   })) as unknown as RegisterOptionsResponse;
 
-  // Persist challenge so verify can consume it
+  // challenge 暂存内存 Map（key=username），/verify 时取出并删除
   saveChallenge(username, options.challenge);
 
   res.json(options);
@@ -64,6 +69,8 @@ router.post("/verify", async (req, res) => {
 
   if (verification.verified && verification.registrationInfo) {
     const { credential } = verification.registrationInfo;
+    // 凭证公钥存入 SQLite server/data/webauthn.db（credentials 表）
+    // 私钥由浏览器交给操作系统安全区域（Touch ID/Face ID/安全密钥），服务器不可见
     const newCred: WebAuthnCredential = {
       id: credential.id,
       publicKey: credential.publicKey,

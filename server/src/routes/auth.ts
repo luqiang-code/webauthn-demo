@@ -1,3 +1,8 @@
+// 认证流程数据流：
+//   POST /options → 查 SQLite 是否有该用户的凭证 → 生成 challenge（存内存 Map）→ 返回
+//   POST /verify  → 消费 challenge + 查 SQLite 取公钥验证签名 → 更新 counter 回 SQLite
+//   私钥签名在用户设备本地完成，服务器只验证签名，不接触私钥
+
 import { Router } from "express";
 import {
   generateAuthenticationOptions,
@@ -68,7 +73,8 @@ router.post("/verify", async (req, res) => {
   });
 
   if (verification.verified) {
-    // Update counter to prevent replay
+    // 更新 SQLite 中的 counter，防止签名重放
+    // counter 是认证器内部单调递增的签名计数，每次签名 +1
     credential.counter = verification.authenticationInfo.newCounter;
     updateCredentialCounter(credential.id, verification.authenticationInfo.newCounter);
     console.log(`✓ Authenticated "${username}"`);

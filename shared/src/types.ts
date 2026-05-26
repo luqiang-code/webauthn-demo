@@ -1,5 +1,13 @@
 /// ── API 通用类型 —— 前后端共享的协议 ──────────────────────────
 
+// 前后端共享的 API 协议类型
+// 数据流向：
+//   注册：浏览器 → POST /api/register/options → 拿 challenge
+//                → 用户指纹/Face ID 签名 → POST /api/register/verify → 公钥存入 SQLite
+//   认证：浏览器 → POST /api/auth/options → 拿 challenge
+//                → 用户指纹/Face ID 签名 → POST /api/auth/verify → 验证签名 → 更新 counter
+//   私钥始终在用户设备的安全区域，服务器只存公钥
+
 // ── Request DTOs ──
 
 export interface RegisterOptionsRequest {

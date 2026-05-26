@@ -1,3 +1,8 @@
+// 客户端存储位置：
+//   localStorage key="passkey-username" → 上次成功登录/注册的用户名
+//   DOM 元素 state（内存）            → UI 状态（loading、消息、按钮状态）
+//   凭证私钥                          → 操作系统级（Touch ID/Windows Hello），JS 无法访问
+
 // DOM cache
 const card = document.getElementById("app")!;
 const fingerprintSpinner = document.getElementById("fingerprintSpinner")!;
@@ -63,7 +68,7 @@ export function setAuthenticatorStatus(available: boolean): void {
   }
 }
 
-// ── Username ─────────────────────────────────────────────────
+// ── Username（localStorage 持久化） ─────────────────────────────
 
 export function getUsername(): string {
   return usernameInput.value.trim();
@@ -73,6 +78,8 @@ export function setUsername(value: string): void {
   usernameInput.value = value;
 }
 
+// 存入浏览器 localStorage，key="passkey-username"
+// 下次打开页面自动预填，避免重复输入
 export function saveUsername(username: string): void {
   try { localStorage.setItem("passkey-username", username); } catch { /* quota exceeded */ }
 }

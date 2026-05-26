@@ -1,3 +1,8 @@
+// Express 服务端入口（端口 3000）
+// 部署架构（开发环境）：
+//   浏览器 :5173 → Vite dev server → proxy /api → localhost:3000
+//   数据存储：server/data/webauthn.db（SQLite，持久化凭证）
+
 import express from "express";
 import cors from "cors";
 import registerRoutes from "./routes/register";
