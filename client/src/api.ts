@@ -28,16 +28,22 @@ async function post<T>(path: string, body: unknown, signal?: AbortSignal): Promi
     signal,
   });
 
-  const data = await res.json();
+  const contentType = res.headers.get("content-type") ?? "";
 
   if (!res.ok) {
-    throw new ApiError(
-      res.status,
-      (data as any)?.error ?? `Server error (${res.status})`,
-    );
+    let message = `Server error (${res.status})`;
+    if (contentType.includes("application/json")) {
+      const data = await res.json();
+      message = (data as any)?.error ?? message;
+    }
+    throw new ApiError(res.status, message);
   }
 
-  return data as T;
+  if (!contentType.includes("application/json")) {
+    throw new ApiError(res.status, "服务器返回了非预期的响应，请检查服务是否正常运行");
+  }
+
+  return res.json() as Promise<T>;
 }
 
 export async function getRegisterOptions(
