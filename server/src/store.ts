@@ -122,22 +122,48 @@ export function updateCredentialCounter(credentialId: string, counter: number): 
   stmtUpdateCounter.run(counter, credentialId);
 }
 
-// Challenge 存储（内存 Map，临时）：
-//   key   → username
-//   value → challenge 字符串（服务端随机生成，客户端需签名后返回）
-// 生命周期：saveChallenge 写入 → consumeChallenge 读取并删除（一次性使用）
-// 服务重启后所有 challenge 丢失，用户需重新发起认证
-const challenges = new Map<string, string>();
+// Challenge 存储（内存 Map，带 TTL）：
+//   key     → username 或 discover（用于无用户名流程）
+//   value   → { challenge: string, expiresAt: number (epoch ms) }
+// 生命周期：saveChallenge 写入 → consumeChallenge 校验 TTL 后读取并删除（一次性使用）
+// 过期挑战由 pruneChallenges 定期清理，服务重启后所有 challenge 丢失
+const CHALLENGE_TTL = 5 * 60 * 1000; // 5 分钟
+
+interface ChallengeEntry {
+  challenge: string;
+  expiresAt: number;
+}
+
+const challenges = new Map<string, ChallengeEntry>();
 
 export function saveChallenge(key: string, challenge: string): void {
-  challenges.set(key, challenge);
+  challenges.set(key, { challenge, expiresAt: Date.now() + CHALLENGE_TTL });
 }
 
 export function consumeChallenge(key: string): string | undefined {
-  const c = challenges.get(key);
+  const entry = challenges.get(key);
   challenges.delete(key);
-  return c;
+  if (!entry) return undefined;
+  if (Date.now() > entry.expiresAt) return undefined;
+  return entry.challenge;
 }
+
+function pruneChallenges(): void {
+  const now = Date.now();
+  let pruned = 0;
+  for (const [key, entry] of challenges) {
+    if (now > entry.expiresAt) {
+      challenges.delete(key);
+      pruned++;
+    }
+  }
+  if (pruned > 0) {
+    console.log(`Pruned ${pruned} expired challenges`);
+  }
+}
+
+// 每 5 分钟清理一次过期 challenge
+setInterval(pruneChallenges, 5 * 60 * 1000);
 
 // ── Session Store（SQLite 持久化）────────────────────────────────
 
