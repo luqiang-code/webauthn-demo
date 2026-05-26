@@ -4,13 +4,7 @@ import {
   verifyRegistrationResponse,
 } from "@simplewebauthn/server";
 import type { WebAuthnCredential } from "@simplewebauthn/server";
-import type {
-  RegisterOptionsRequest,
-  RegisterVerifyRequest,
-  RegisterOptionsResponse,
-  VerifyResponse,
-} from "@webauthn-demo/shared";
-import { getCredentials, saveCredential } from "../store.js";
+import { getCredentials, addCredential } from "../store";
 
 const router = Router();
 
@@ -18,19 +12,18 @@ const RP_NAME = "WebAuthn Demo";
 const RP_ID = "localhost";
 const ORIGIN = "http://localhost:3000";
 
-// POST /api/register/options
 router.post("/options", async (req, res) => {
-  const { username } = req.body as RegisterOptionsRequest;
+  const { username } = req.body;
   if (!username) return res.status(400).json({ error: "username required" });
 
-  const existing = getCredentials(username);
+  const credentials = getCredentials(username);
 
-  const options = (await generateRegistrationOptions({
+  const options = await generateRegistrationOptions({
     rpName: RP_NAME,
     rpID: RP_ID,
     userName: username,
     attestationType: "none",
-    excludeCredentials: existing.map((cred) => ({
+    excludeCredentials: credentials.map((cred) => ({
       id: cred.id,
       transports: cred.transports,
     })),
@@ -38,20 +31,19 @@ router.post("/options", async (req, res) => {
       residentKey: "preferred",
       userVerification: "preferred",
     },
-  })) as unknown as RegisterOptionsResponse;
+  });
 
   (req as any)._challenge = options.challenge;
 
   res.json(options);
 });
 
-// POST /api/register/verify
 router.post("/verify", async (req, res) => {
-  const { username, registrationResponse } = req.body as RegisterVerifyRequest;
+  const { username, registrationResponse } = req.body;
   const expectedChallenge = (req as any)._challenge;
 
   const verification = await verifyRegistrationResponse({
-    response: registrationResponse as any,
+    response: registrationResponse,
     expectedChallenge: expectedChallenge ?? "",
     expectedOrigin: ORIGIN,
     expectedRPID: RP_ID,
@@ -63,16 +55,14 @@ router.post("/verify", async (req, res) => {
       id: credential.id,
       publicKey: credential.publicKey,
       counter: credential.counter,
-      transports: (registrationResponse as any).response?.transports,
+      transports: registrationResponse.response?.transports,
     };
-    saveCredential(username, newCred);
+    addCredential(username, newCred);
     console.log(`✓ Registered credential for "${username}"`);
-    return res.json({ verified: true } satisfies VerifyResponse);
+    return res.json({ verified: true });
   }
 
-  res
-    .status(400)
-    .json({ verified: false, error: "Verification failed" } satisfies VerifyResponse);
+  res.status(400).json({ verified: false, error: "Verification failed" });
 });
 
 export default router;
