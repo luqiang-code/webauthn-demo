@@ -7,6 +7,7 @@
 import express from "express";
 import session from "express-session";
 import cors from "cors";
+import { SQLiteSessionStore } from "./store.js";
 import registerRoutes from "./routes/register";
 import authRoutes from "./routes/auth";
 
@@ -14,9 +15,11 @@ const app = express();
 app.use(express.json());
 
 const SESSION_MAX_AGE = 24 * 60 * 60 * 1000; // 24 小时
+const SESSION_SECRET = process.env.SESSION_SECRET ?? "webauthn-demo-dev-secret";
 
 app.use(session({
-  secret: "webauthn-demo-dev-secret",
+  store: new SQLiteSessionStore(),
+  secret: SESSION_SECRET,
   resave: false,
   saveUninitialized: false,
   cookie: {

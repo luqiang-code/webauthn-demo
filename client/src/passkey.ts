@@ -9,6 +9,8 @@ import {
   verifyRegistration,
   getAuthOptions,
   verifyAuthentication,
+  getDiscoverOptions,
+  verifyDiscover,
   ApiError,
 } from "./api.js";
 import {
@@ -117,5 +119,48 @@ export async function authenticateWithPasskey(username: string): Promise<void> {
   } finally {
     setLoading(btnAuth, false);
     setButtonsEnabled(true);
+  }
+}
+
+// 无用户名登录（discoverable credential）
+// 浏览器会弹出 passkey 选择器：本地有 → 指纹/面容验证，没有 → 显示二维码供手机扫描
+export async function authenticateDiscoverable(): Promise<void> {
+  const btnAuth = document.getElementById("btnAuth") as HTMLButtonElement;
+  const btnRegister = document.getElementById("btnRegister") as HTMLButtonElement;
+
+  setButtonsEnabled(false);
+  setLoading(btnAuth, true);
+  clearMessage();
+  hideBiometricPrompt();
+
+  try {
+    const options = await getDiscoverOptions();
+
+    showBiometricPrompt();
+    const authResp = await startAuthentication({ optionsJSON: options as any });
+    hideBiometricPrompt();
+
+    const result = await verifyDiscover(authResp as any);
+
+    if (result.verified) {
+      showSuccess();
+      showMessage("登录成功！", "success");
+    } else {
+      showError();
+      showMessage(result.error ?? "登录验证失败", "error");
+    }
+  } catch (err) {
+    hideBiometricPrompt();
+    showError();
+    if (err instanceof ApiError) {
+      showMessage(`服务器错误: ${err.message}`, "error");
+    } else {
+      showMessage(handleWebAuthnError(err), "error");
+    }
+  } finally {
+    setLoading(btnAuth, false);
+    setButtonsEnabled(true);
+    // 恢复注册按钮（discoverable 失败时仍然可用）
+    btnRegister.disabled = false;
   }
 }

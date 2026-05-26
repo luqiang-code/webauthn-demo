@@ -1,5 +1,5 @@
 import "./style.css";
-import { checkAuthenticatorStatus, registerPasskey, authenticateWithPasskey } from "./passkey.js";
+import { checkAuthenticatorStatus, registerPasskey, authenticateWithPasskey, authenticateDiscoverable } from "./passkey.js";
 import { getCurrentUser, logout } from "./api.js";
 import { getUsername, loadSavedUsername, setUsername, showMessage } from "./state.js";
 
@@ -29,14 +29,9 @@ function showLoggedInUI(username: string): void {
   }
 })();
 
-// Bind buttons — login
+// Primary login button — discoverable credential（无用户名，支持跨设备 QR 码）
 document.getElementById("btnAuth")!.addEventListener("click", async () => {
-  const username = getUsername();
-  if (!username) {
-    showMessage("请先输入用户名", "info");
-    return;
-  }
-  await authenticateWithPasskey(username);
+  await authenticateDiscoverable();
   // After successful login, switch UI
   try {
     const user = await getCurrentUser();
@@ -44,7 +39,7 @@ document.getElementById("btnAuth")!.addEventListener("click", async () => {
   } catch { /* stay on login form */ }
 });
 
-// Bind buttons — register
+// Register button
 document.getElementById("btnRegister")!.addEventListener("click", async () => {
   const username = getUsername();
   if (!username) {
@@ -52,23 +47,33 @@ document.getElementById("btnRegister")!.addEventListener("click", async () => {
     return;
   }
   await registerPasskey(username);
-  // After successful registration (auto-login), switch UI
   try {
     const user = await getCurrentUser();
     if (user.username) showLoggedInUI(user.username);
   } catch { /* stay on login form */ }
 });
 
-// Bind buttons — logout
+// Logout button
 document.getElementById("btnLogout")!.addEventListener("click", async () => {
   await logout();
   showLoggedOutUI();
   showMessage("已登出", "info");
 });
 
-// Enter key triggers login
+// Enter key — username-based login（有用户名时的精确匹配登录）
 document.getElementById("username")!.addEventListener("keydown", (e) => {
   if (e.key === "Enter") {
-    document.getElementById("btnAuth")!.click();
+    const username = getUsername();
+    if (!username) {
+      // 没输用户名就走 discoverable 流程
+      document.getElementById("btnAuth")!.click();
+      return;
+    }
+    authenticateWithPasskey(username).then(async () => {
+      try {
+        const user = await getCurrentUser();
+        if (user.username) showLoggedInUI(user.username);
+      } catch { /* stay on login form */ }
+    });
   }
 });

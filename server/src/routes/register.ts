@@ -16,6 +16,7 @@ import type {
   VerifyResponse,
 } from "@webauthn-demo/shared";
 import { getCredentials, saveCredential, saveChallenge, consumeChallenge } from "../store.js";
+import { encodeUserHandle } from "../user-handle.js";
 
 const router = Router();
 
@@ -40,6 +41,7 @@ router.post("/options", async (req, res) => {
   const options = (await generateRegistrationOptions({
     rpName: RP_NAME,
     rpID: RP_ID,
+    userID: encodeUserHandle(username) as any,
     userName: username,
     attestationType: "none",
     excludeCredentials: existing.map((cred) => ({
@@ -67,12 +69,18 @@ router.post("/verify", async (req, res) => {
     return res.status(400).json({ error: "Challenge expired or missing" });
   }
 
-  const verification = await verifyRegistrationResponse({
-    response: registrationResponse as any,
-    expectedChallenge,
-    expectedOrigin: ORIGIN,
-    expectedRPID: RP_ID,
-  });
+  let verification;
+  try {
+    verification = await verifyRegistrationResponse({
+      response: registrationResponse as any,
+      expectedChallenge,
+      expectedOrigin: ORIGIN,
+      expectedRPID: RP_ID,
+    });
+  } catch (err) {
+    console.error("Registration verification error:", err);
+    return res.status(400).json({ verified: false, error: "Verification failed" } satisfies VerifyResponse);
+  }
 
   if (verification.verified && verification.registrationInfo) {
     const { credential } = verification.registrationInfo;

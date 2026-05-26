@@ -1,10 +1,12 @@
 // 数据存储位置说明：
-//   1. SQLite 数据库 → server/data/webauthn.db（持久化，存凭证公钥）
+//   1. SQLite 数据库 → server/data/webauthn.db（持久化，存凭证公钥 + sessions）
 //   2. 内存 Map     → challenges（临时，存 challenge，用完即删）
 //   3. 浏览器端     → localStorage key="passkey-username"（存上次登录的用户名）
 //   4. 操作系统级   → 指纹/Face ID/Touch ID/Windows Hello（存私钥，浏览器不暴露）
 
 import type { WebAuthnCredential } from "@simplewebauthn/server";
+import type { SessionData } from "express-session";
+import { Store } from "express-session";
 import Database from "better-sqlite3";
 import { join, dirname } from "node:path";
 import { mkdirSync, existsSync } from "node:fs";
@@ -39,6 +41,20 @@ db.exec(`
 
 db.exec(`CREATE INDEX IF NOT EXISTS idx_credentials_username ON credentials (username)`);
 
+// sessions 表结构（SQLite 持久化 session，服务重启不丢失登录态）：
+//   sid     → session ID（express-session 的 connect.sid cookie 值，主键）
+//   sess    → session 数据（JSON 字符串）
+//   expired → 过期时间（Unix 秒，用于查询过滤和定期清理）
+db.exec(`
+  CREATE TABLE IF NOT EXISTS sessions (
+    sid TEXT PRIMARY KEY,
+    sess TEXT NOT NULL,
+    expired INTEGER NOT NULL
+  )
+`);
+
+db.exec(`CREATE INDEX IF NOT EXISTS idx_sessions_expired ON sessions (expired)`);
+
 // ── Prepared statements ────────────────────────────────────────
 
 const stmtGetByUsername = db.prepare("SELECT * FROM credentials WHERE username = ?");
@@ -48,6 +64,16 @@ const stmtInsert = db.prepare(`
   VALUES (@id, @username, @publicKey, @counter, @transports)
 `);
 const stmtUpdateCounter = db.prepare("UPDATE credentials SET counter = ? WHERE id = ?");
+
+// Session prepared statements
+const stmtSessGet = db.prepare("SELECT sess FROM sessions WHERE sid = ? AND expired > ?");
+const stmtSessSet = db.prepare(`
+  INSERT INTO sessions (sid, sess, expired) VALUES (@sid, @sess, @expired)
+  ON CONFLICT(sid) DO UPDATE SET sess = @sess, expired = @expired
+`);
+const stmtSessDestroy = db.prepare("DELETE FROM sessions WHERE sid = ?");
+const stmtSessTouch = db.prepare("UPDATE sessions SET expired = ? WHERE sid = ?");
+const stmtSessPrune = db.prepare("DELETE FROM sessions WHERE expired <= ?");
 
 // ── Public API ──────────────────────────────────────────────────
 
@@ -82,6 +108,12 @@ export function findCredential(
   if (row && row.username === username) return rowToCredential(row);
 }
 
+// 按凭据 ID 查找（无需用户名，用于 discoverable credential 流程）
+export function findCredentialById(credentialId: string): (WebAuthnCredential & { username: string }) | undefined {
+  const row = stmtGetById.get(credentialId) as any;
+  if (row) return { ...rowToCredential(row), username: row.username };
+}
+
 export function persistCredentials(): void {
   // counter updates happen via updateCounter — no-op for full persist
 }
@@ -105,4 +137,65 @@ export function consumeChallenge(key: string): string | undefined {
   const c = challenges.get(key);
   challenges.delete(key);
   return c;
+}
+
+// ── Session Store（SQLite 持久化）────────────────────────────────
+
+export class SQLiteSessionStore extends Store {
+  constructor() {
+    super();
+    // 每 5 分钟清理一次过期 session
+    setInterval(() => this.prune(), 5 * 60 * 1000);
+  }
+
+  get(sid: string, callback: (err?: any, session?: SessionData | null) => void): void {
+    try {
+      const now = Math.floor(Date.now() / 1000);
+      const row = stmtSessGet.get(sid, now) as { sess: string } | undefined;
+      callback(null, row ? JSON.parse(row.sess) : null);
+    } catch (err) {
+      callback(err);
+    }
+  }
+
+  set(sid: string, session: SessionData, callback?: (err?: any) => void): void {
+    try {
+      const maxAge = session.cookie?.maxAge ?? 24 * 60 * 60 * 1000;
+      const expired = Math.floor((Date.now() + maxAge) / 1000);
+      stmtSessSet.run({ sid, sess: JSON.stringify(session), expired });
+      callback?.();
+    } catch (err) {
+      callback?.(err);
+    }
+  }
+
+  destroy(sid: string, callback?: (err?: any) => void): void {
+    try {
+      stmtSessDestroy.run(sid);
+      callback?.();
+    } catch (err) {
+      callback?.(err);
+    }
+  }
+
+  touch(sid: string, session: SessionData, callback?: (err?: any) => void): void {
+    try {
+      const maxAge = session.cookie?.maxAge ?? 24 * 60 * 60 * 1000;
+      const expired = Math.floor((Date.now() + maxAge) / 1000);
+      stmtSessTouch.run(expired, sid);
+      callback?.();
+    } catch (err) {
+      callback?.(err);
+    }
+  }
+
+  private prune(): void {
+    try {
+      const now = Math.floor(Date.now() / 1000);
+      const result = stmtSessPrune.run(now);
+      if (result.changes > 0) {
+        console.log(`Pruned ${result.changes} expired sessions`);
+      }
+    } catch { /* best effort */ }
+  }
 }

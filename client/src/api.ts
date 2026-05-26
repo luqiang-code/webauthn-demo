@@ -95,3 +95,17 @@ export async function logout(): Promise<void> {
   const res = await fetch("/api/auth/logout", { method: "POST" });
   if (!res.ok) throw new ApiError(res.status, "Logout failed");
 }
+
+// ── Discoverable credential（无用户名登录）──────────────────────
+
+export async function getDiscoverOptions(): Promise<AuthOptionsResponse> {
+  return post<AuthOptionsResponse>("/api/auth/discover", {});
+}
+
+export async function verifyDiscover(
+  authenticationResponse: Record<string, unknown>,
+): Promise<VerifyResponse> {
+  return post<VerifyResponse>("/api/auth/discover/verify", {
+    authenticationResponse,
+  });
+}
